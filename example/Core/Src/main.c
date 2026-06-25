@@ -18,6 +18,7 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
+#include "m0ss.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
@@ -31,7 +32,7 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-
+#define BLINK_THREAD_STACK_BUF_CAPACITY 1024
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -42,14 +43,33 @@
 /* Private variables ---------------------------------------------------------*/
 
 /* USER CODE BEGIN PV */
-
+_Alignas(8) static uint8_t blink_thread_stack_buf[BLINK_THREAD_STACK_BUF_CAPACITY];
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 /* USER CODE BEGIN PFP */
+void blink_thread_func()
+{
+    GPIO_InitTypeDef GPIO_InitStruct = { };
 
+    GPIO_InitStruct.Pin = GPIO_PIN_5;
+    GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+    GPIO_InitStruct.Pull = GPIO_NOPULL;
+    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+    HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+
+    while (1) {
+        HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_5);
+
+        uint32_t cycles = SystemCoreClock >> 4;
+        for (volatile uint32_t cycle = 0; cycle < cycles; ++cycle)
+            ;
+
+        m0ss_schedule();
+    }
+}
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -87,7 +107,11 @@ int main(void)
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
   /* USER CODE BEGIN 2 */
+  m0ss_thread blink_thread;
 
+  m0ss_thread_create(&blink_thread, blink_thread_func, blink_thread_stack_buf, BLINK_THREAD_STACK_BUF_CAPACITY);
+
+  m0ss_start();
   /* USER CODE END 2 */
 
   /* Infinite loop */
